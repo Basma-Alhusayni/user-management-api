@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using UserManagementApi.Data;
 using UserManagementApi.Interfaces;
@@ -20,7 +16,13 @@ namespace UserManagementApi.Services
 
         public async Task<List<User>> GetAllUsers()
         {
-            return await _context.Users.ToListAsync();
+            return await _context.Users.Include(u => u.Profile).ToListAsync();
+        }
+
+        public async Task<User?> GetUserById(int id)
+        {
+            return await _context.Users.Include(u => u.Profile)
+                                       .FirstOrDefaultAsync(u => u.Id == id);
         }
 
         public async Task<User> AddUser(User newUser)
@@ -28,6 +30,38 @@ namespace UserManagementApi.Services
             await _context.Users.AddAsync(newUser);
             await _context.SaveChangesAsync();
             return newUser;
+        }
+
+        public async Task<User?> UpdateUser(int id, User updatedUser)
+        {
+            var existingUser = await _context.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == id);
+            if (existingUser == null) return null;
+
+            existingUser.Name = updatedUser.Name;
+            existingUser.Email = updatedUser.Email;
+            existingUser.Address = updatedUser.Address;
+
+            if (updatedUser.Profile != null)
+            {
+                if (existingUser.Profile == null)
+                    existingUser.Profile = new Profile();
+
+                existingUser.Profile.Bio = updatedUser.Profile.Bio;
+                existingUser.Profile.PhoneNumber = updatedUser.Profile.PhoneNumber;
+            }
+
+            await _context.SaveChangesAsync();
+            return existingUser;
+        }
+
+        public async Task<bool> DeleteUser(int id)
+        {
+            var user = await _context.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return false;
+
+            _context.Users.Remove(user);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

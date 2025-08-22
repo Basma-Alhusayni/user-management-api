@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Threading.Tasks;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using UserManagementApi.Interfaces;
 using UserManagementApi.Models;
-using UserManagementApi.Services;
+using UserManagementApi.Dtos.User;
 
 namespace UserManagementApi.Controllers
 {
@@ -14,41 +11,53 @@ namespace UserManagementApi.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
+        private readonly IMapper _mapper;
 
-        public UserController(IUserService userService)
+        public UserController(IUserService userService, IMapper mapper)
         {
             _userService = userService;
+            _mapper = mapper;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllUsers()
         {
-            try
-            {
-                var users = await _userService.GetAllUsers();
-                return Ok(users);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+            var users = await _userService.GetAllUsers();
+            var result = _mapper.Map<List<UserDto>>(users);
+            return Ok(result);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetUserById(int id)
+        {
+            var user = await _userService.GetUserById(id);
+            if (user == null) return NotFound();
+            return Ok(_mapper.Map<UserDto>(user));
         }
 
         [HttpPost]
-        public async Task<IActionResult> AddUser([FromBody] User newUser)
+        public async Task<IActionResult> AddUser([FromBody] UserCreateDto newUserDto)
         {
-            try
-            {
-                if (!ModelState.IsValid)
-                    return BadRequest(ModelState);
+            var user = _mapper.Map<User>(newUserDto);
+            var createdUser = await _userService.AddUser(user);
+            return CreatedAtAction(nameof(GetUserById), new { id = createdUser.Id }, _mapper.Map<UserDto>(createdUser));
+        }
 
-                var user = await _userService.AddUser(newUser);
-                return CreatedAtAction(nameof(GetAllUsers), new { id = user.Id }, user);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateUser(int id, [FromBody] UserUpdateDto updatedUserDto)
+        {
+            var updatedUser = _mapper.Map<User>(updatedUserDto);
+            var result = await _userService.UpdateUser(id, updatedUser);
+            if (result == null) return NotFound();
+            return Ok(_mapper.Map<UserDto>(result));
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var deleted = await _userService.DeleteUser(id);
+            if (!deleted) return NotFound();
+            return NoContent();
         }
     }
 }
